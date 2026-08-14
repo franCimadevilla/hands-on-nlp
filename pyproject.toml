@@ -1,0 +1,10 @@
+[project]
+name = "hands-on-nlp"
+version = "0.1.0"
+description = "NLP sequence modeling sandbox: Char-RNN text generation, stateful GRUs, and Attention mechanisms in TensorFlow/Keras"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "ipykernel>=7.3.0",
+    "tensorflow>=2.10.0",
+]

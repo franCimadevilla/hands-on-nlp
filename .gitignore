@@ -1,0 +1,58 @@
+# ==============================================================================
+.venv/
+.uv/
+
+# ==============================================================================
+# Archivos precompilados por Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribuciones, empaquetados y compilaciones
+*.egg-info/
+.eggs/
+dist/
+build/
+develop-eggs/
+downloads/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+
+# Registros de errores de Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+
+# ==============================================================================
+# Puntos de guardado automático de Jupyter
+.ipynb_checkpoints
+
+
+# ==============================================================================
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# ==============================================================================
+.env
+.env.*
+!.env.example
+
+# Configuración de editores (VS Code, Cursor, PyCharm)
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
