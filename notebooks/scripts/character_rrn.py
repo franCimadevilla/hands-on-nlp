@@ -42,3 +42,45 @@ def to_dataset(sequence, length, shuffle=False, seed=None, batch_size=32):
     # 6. Split each batch into Inputs X (from index 0 up to the second-to-last token) 
     #    and Targets Y (from index 1 to the end), then optimize pipeline execution with prefetch.
     return ds.map(lambda window_: (window_[:, :-1], window_[:, 1:])).prefetch(1)
+
+
+def next_char(text, model, vocabulary, temperature=1.0):
+    """Generates the next predicted character for a given text using stochastic sampling.
+
+    Applies a temperature factor to the model's logits to control the diversity
+    and creativity of the generated text prior to sampling a character.
+
+    Args:
+        text (tf.Tensor): The input text (or list of texts) upon which
+            the model will make the prediction.
+        model (tf.keras.Model): The trained language model for sequence prediction.
+        vocabulary (list[str]): The list of vocabulary items mapping IDs to characters.
+        temperature (float, optional): Controls the randomness of the prediction.
+            - Close to 0: Generates deterministic, rigid text (favors high-probability characters).
+            - Close to 1: Preserves the original learned probabilities.
+            - > 1: Increases diversity and creativity (flattening the probability distribution).
+            Defaults to 1.0.
+
+    Returns:
+        str: The selected character sampled according to the adjusted probability distribution.
+    """
+    # 1. Obtain the predicted probability distribution for the last token/character in the sequence
+    y_proba = model(text)[0, -1:]
+    
+    # 2. Convert probabilities back to logits and scale by the temperature factor.
+    #    Dividing logits by T > 1 flattens the distribution (increases diversity);
+    #    Dividing by T < 1 sharpens the distribution (increases conservatism).
+    rescaled_logits = tf.math.log(y_proba) / temperature 
+    
+    # 3. Randomly sample 1 token based on the rescaled logit distribution
+    char_id = tf.random.categorical(rescaled_logits, num_samples=1)[0, 0]
+    
+    # 4. Decode the sampled ID into its corresponding character from the vocabulary.
+    #    An offset of +2 is added to account for special/reserved tokens in the vocabulary.
+    return vocabulary[char_id + 2]
+
+
+def extend_text(text, model, vocabulary, n_chars=500, temperature=1):
+    for _ in range(n_chars):
+        text += next_char(text, model, vocabulary, temperature)
+    return text
