@@ -1,5 +1,8 @@
 import tensorflow as tf
 
+################################
+## 1. Stateless RNN
+################################
 def to_dataset(sequence, length, shuffle=False, seed=None, batch_size=32):
     """Creates a tf.data.Dataset tailored for sequence-to-sequence prediction models.
 
@@ -43,6 +46,64 @@ def to_dataset(sequence, length, shuffle=False, seed=None, batch_size=32):
     #    and Targets Y (from index 1 to the end), then optimize pipeline execution with prefetch.
     return ds.map(lambda window_: (window_[:, :-1], window_[:, 1:])).prefetch(1)
 
+################################
+## 2. Stateful RNN
+################################
+
+def to_dataset_for_stateful_rnn(sequence, length):
+    """Prepares a sequential, non-overlapping dataset for stateful RNN training.
+
+    Transforms a single sequence of token IDs into non-overlapping windowed pairs 
+    of inputs (X) and shifted targets (Y), structured for a batch size of 1 to 
+    maintain continuous temporal hidden states across consecutive iterations.
+
+    Args:
+        sequence (tf.Tensor or array-like): The continuous, encoded sequence 
+            of tokens.
+        length (int): The sequence length/window size expected as input by the model.
+
+    Returns:
+        tf.data.Dataset: A dataset emitting tuples of (inputs, targets) where both 
+            tensors have shape (1, length) and temporal continuity is preserved 
+            across steps.
+    """
+    ds = tf.data.Dataset.from_tensor_slices(sequence)
+    ds = ds.window(length + 1, shift=length, drop_remainder=True)
+    ds = ds.flat_map(lambda window: window.batch(length + 1)).batch(1)
+    return ds.map(lambda window: (window[:, :-1], window[:, 1:])).prefetch(1)
+
+class ResetStatesCallback(tf.keras.callbacks.Callback):
+
+    def on_epoch_begin(self, epoch, logs=None):
+        for layer in self.model.layers:
+            if hasattr(layer, "reset_states"):
+                layer.reset_states()
+
+def stateful_weights_stateless(n_tokens, stateful_model_path):
+    best_stateful_model = tf.keras.models.load_model(stateful_model_path)
+
+    stateless_model = tf.keras.Sequential([
+        tf.keras.Input(shape=(None,)),
+        tf.keras.layers.Embedding(
+            input_dim=n_tokens,
+            output_dim=16
+        ),
+        tf.keras.layers.GRU(
+            128,
+            return_sequences=True
+        ),
+        tf.keras.layers.Dense(
+            n_tokens,
+            activation="softmax"
+        )
+    ])
+    stateless_model.set_weights(best_stateful_model.get_weights())
+    return stateless_model    
+
+
+################################
+## Helper functions : Char prediction
+################################
 
 def next_char(text, model, vocabulary, temperature=1.0):
     """Generates the next predicted character for a given text using stochastic sampling.
@@ -80,7 +141,23 @@ def next_char(text, model, vocabulary, temperature=1.0):
     return vocabulary[char_id + 2]
 
 
-def extend_text(text, model, vocabulary, n_chars=500, temperature=1):
+def extend_text(text, model, vocabulary, n_chars=500, temperature : float = 1.0):
     for _ in range(n_chars):
         text += next_char(text, model, vocabulary, temperature)
     return text
+
+def to_string(tensor):
+    """
+    Safely extracts a UTF-8 string from a TensorFlow tensor or NumPy array
+    containing byte strings.
+    """
+
+    numpy_val = tensor.numpy() if hasattr(tensor, 'numpy') else tensor
+    
+    if numpy_val.shape == ():
+        bytes_val = numpy_val
+    else:
+        bytes_val = numpy_val.flat[0]
+    
+    # Decode bytes to string
+    return bytes_val.decode('utf-8')
